@@ -72,7 +72,8 @@ chakra_menor_pontuacao = chakra_menor_pontuacao(dados_filtrados)
 
 
 print("Chakras Com menos pontos: ")
-print(chakra_menor_pontuacao.tail(-1))
+print(chakra_menor_pontuacao)
+chakra_menor_pontuacao
 print("\n")
 
 
@@ -81,10 +82,12 @@ for chakra in chakra_menor_pontuacao["Chakra"]:
     soma = dados_filtrados[(dados_filtrados['Chakra'].str.contains(chakra)) & (dados_filtrados['Soma'] == 0)]["Chakra"]
     Frases.append(soma)
 
-tabela_final = pd.concat(Frases)
+# tabela_final = pd.concat(Frases).reset_index()
+
+# tabela_final['Chakra'] = tabela_final['Chakra'].str.replace('Pontos – ', '', regex=False)
 
 print("Respostas erradas: ")
-print(tabela_final.tail(-1))
+print(Frases)
 
 dados_pdf = {
     "Informações Pessoais": {
@@ -92,7 +95,7 @@ dados_pdf = {
         "E-mail": dados["E-mail"],
         "Whatsapp": dados["Whatsapp"]
     },
-    "Chakras Com Menos Pontos": chakra_menor_pontuacao.iloc[1: , :],
+    "Chakras Com Menos Pontos": chakra_menor_pontuacao,
     "Respostas Erradas": None # Initialize to None
 }
 
@@ -103,32 +106,78 @@ if not chakra_menor_pontuacao.empty: #Check if chakra_menor_pontuacao is not emp
         for chakra in chakra_menor_pontuacao["Chakra"]
     ], ignore_index=True) #add ignore_index=True to avoid issues with duplicate indices
 
+    respostas_erradas["Chakra"] = respostas_erradas["Chakra"].str.replace('Pontos – ', ' - ', regex=False).replace('"', '', regex=False)
     if not respostas_erradas.empty: #Check if any wrong answers exist after concatenation.
-        dados_pdf["Respostas Erradas"] = respostas_erradas.tail(-1)
+        dados_pdf["Respostas Erradas"] = respostas_erradas
 
-#Criando o PDF
-pdf = FPDF()
-pdf.add_page()
-pdf.set_font("Arial", size=12)
+# #Criando o PDF
+# pdf = FPDF()
+# pdf.add_page()
+# pdf.set_font("Arial", size=12)
+
+# for secao, conteudo in dados_pdf.items():
+#     pdf.set_font("Arial", "B", 12) # Define fonte em negrito (Arial, tamanho 12)
+#     pdf.cell(200, 10, txt=f"{secao}", ln=1, align="C", border=1)
+#     pdf.set_font("Arial", "", 12) # Volta para fonte normal (opcional, dependendo do resto do seu documento)
+
+#     if isinstance(conteudo, dict):
+#         for chave, valor in conteudo.items():
+#             pdf.cell(200, 10, txt=f"{chave}: {valor}", ln=1, align="L")
+#     elif isinstance(conteudo, pd.DataFrame):
+#         buffer = io.StringIO()
+#         conteudo.to_csv(buffer, index=False, header=False, encoding='utf-8')
+#         buffer.seek(0)
+#         for line in buffer.readlines():
+#             cleaned_line = line.strip().replace('\u2013', '-')
+#             pdf.multi_cell(0, 10, txt=cleaned_line, align="L")
+#         buffer.close()
+#     elif conteudo is None:
+#         pdf.multi_cell(0, 10, txt="Nenhuma resposta errada encontrada.", align="L")
+
+
+# pdf.output("relatorio.pdf")
+
+from docx import Document
+from docx.shared import Inches
+
+# ... (seu código anterior para carregar dados, etc.) ...
+
+# ... (seu código para processar respostas erradas, que permanece o mesmo) ...
+
+
+# Criando o documento do Word
+document = Document()
+
+def add_heading(document, text, level=1):
+    document.add_heading(text, level)
+
+def add_paragraph(document, text):
+    document.add_paragraph(text)
+
+
+def add_table(document, dataframe):
+    table = document.add_table(rows=1, cols=len(dataframe.columns))
+    hdr_cells = table.rows[0].cells
+    for i, col in enumerate(dataframe.columns):
+        hdr_cells[i].text = col
+
+    for index, row in dataframe.iterrows():
+        row_cells = table.add_row().cells
+        for i, cell in enumerate(row):
+            row_cells[i].text = str(cell)
+
 
 for secao, conteudo in dados_pdf.items():
-    pdf.set_font("Arial", "B", 12) # Define fonte em negrito (Arial, tamanho 12)
-    pdf.cell(200, 10, txt=f"{secao}:", ln=1, align="L", border=1)
-    pdf.set_font("Arial", "", 12) # Volta para fonte normal (opcional, dependendo do resto do seu documento)
-
+    add_heading(document, f"{secao}:", level=1)
     if isinstance(conteudo, dict):
         for chave, valor in conteudo.items():
-            pdf.cell(200, 10, txt=f"{chave}: {valor}", ln=1, align="L")
+            add_paragraph(document, f"{chave}: {valor}")
     elif isinstance(conteudo, pd.DataFrame):
-        buffer = io.StringIO()
-        conteudo.to_csv(buffer, index=False, header=True, encoding='utf-8')
-        buffer.seek(0)
-        for line in buffer.readlines():
-            cleaned_line = line.strip().replace('\u2013', '-')
-            pdf.multi_cell(0, 10, txt=cleaned_line, align="L")
-        buffer.close()
+        if not conteudo.empty:
+            add_table(document, conteudo)
+        else:
+            add_paragraph(document, "Nenhuma resposta errada encontrada.")
     elif conteudo is None:
-        pdf.multi_cell(0, 10, txt="Nenhuma resposta errada encontrada.", align="L")
+        add_paragraph(document, "Nenhuma resposta errada encontrada.")
 
-
-pdf.output("relatorio.pdf")
+document.save("relatorio.docx")
