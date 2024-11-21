@@ -1,6 +1,6 @@
 import pandas as pd
 from fpdf import FPDF
-from IPython.display import display, HTML
+from tabulate import tabulate
 import io
 
 
@@ -70,8 +70,9 @@ print("\n")
 
 chakra_menor_pontuacao = chakra_menor_pontuacao(dados_filtrados)
 
+
 print("Chakras Com menos pontos: ")
-print(chakra_menor_pontuacao)
+print(chakra_menor_pontuacao.tail(-1))
 print("\n")
 
 
@@ -83,7 +84,7 @@ for chakra in chakra_menor_pontuacao["Chakra"]:
 tabela_final = pd.concat(Frases)
 
 print("Respostas erradas: ")
-print(tabela_final)
+print(tabela_final.tail(-1))
 
 dados_pdf = {
     "Informações Pessoais": {
@@ -91,7 +92,7 @@ dados_pdf = {
         "E-mail": dados["E-mail"],
         "Whatsapp": dados["Whatsapp"]
     },
-    "Chakras Com Menos Pontos":  chakra_menor_pontuacao,
+    "Chakras Com Menos Pontos": chakra_menor_pontuacao.iloc[1: , :],
     "Respostas Erradas": None # Initialize to None
 }
 
@@ -103,7 +104,7 @@ if not chakra_menor_pontuacao.empty: #Check if chakra_menor_pontuacao is not emp
     ], ignore_index=True) #add ignore_index=True to avoid issues with duplicate indices
 
     if not respostas_erradas.empty: #Check if any wrong answers exist after concatenation.
-        dados_pdf["Respostas Erradas"] = respostas_erradas
+        dados_pdf["Respostas Erradas"] = respostas_erradas.tail(-1)
 
 #Criando o PDF
 pdf = FPDF()
@@ -111,19 +112,22 @@ pdf.add_page()
 pdf.set_font("Arial", size=12)
 
 for secao, conteudo in dados_pdf.items():
-    pdf.cell(200, 10, txt=f"{secao}:", ln=1, align="L")
+    pdf.set_font("Arial", "B", 12) # Define fonte em negrito (Arial, tamanho 12)
+    pdf.cell(200, 10, txt=f"{secao}:", ln=1, align="L", border=1)
+    pdf.set_font("Arial", "", 12) # Volta para fonte normal (opcional, dependendo do resto do seu documento)
+
     if isinstance(conteudo, dict):
         for chave, valor in conteudo.items():
-            pdf.cell(200, 10, txt=f"- {chave}: {valor}", ln=1, align="L")
+            pdf.cell(200, 10, txt=f"{chave}: {valor}", ln=1, align="L")
     elif isinstance(conteudo, pd.DataFrame):
         buffer = io.StringIO()
-        conteudo.to_csv(buffer, index=False, header=True, encoding='utf-8') #Encode to utf-8 first
+        conteudo.to_csv(buffer, index=False, header=True, encoding='utf-8')
         buffer.seek(0)
         for line in buffer.readlines():
-            cleaned_line = line.strip().replace('\u2013', '-') # Replace en dash with hyphen
+            cleaned_line = line.strip().replace('\u2013', '-')
             pdf.multi_cell(0, 10, txt=cleaned_line, align="L")
         buffer.close()
-    elif conteudo is None: #Handle the case where there are no wrong answers.
+    elif conteudo is None:
         pdf.multi_cell(0, 10, txt="Nenhuma resposta errada encontrada.", align="L")
 
 
