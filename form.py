@@ -1,8 +1,10 @@
 import pandas as pd
+from tabulate import tabulate
 # import re
 
 filepath = "../AvaChakras.xlsx"  # Substitua pelo seu caminho de arquivo
 df = pd.read_excel(filepath)
+df.head()
 
 def get_columns(filepath, column):
     """
@@ -62,7 +64,6 @@ dados = df[["Id","Nome Completo:", "E-mail:", "Whatsapp:"]]
 chakras_df = pd.DataFrame(columns=['Chakra', 'Soma'])
 
 id = 1
-print("Dados:", dados[dados["Id"] == id])
 chakras_df = append_sum_to_dataframe(list_chakras[0], df[laringeo_columns], dados, id,chakras_df)
 chakras_df = append_sum_to_dataframe(list_chakras[1], df[sexual_columns], dados, id,chakras_df)
 chakras_df = append_sum_to_dataframe(list_chakras[2], df[solar_columns], dados, id,chakras_df)
@@ -71,4 +72,20 @@ chakras_df = append_sum_to_dataframe(list_chakras[4], df[base_columns], dados, i
 chakras_df = append_sum_to_dataframe(list_chakras[5], df[coro_columns], dados, id,chakras_df)
 chakras_df = append_sum_to_dataframe(list_chakras[6], df[frontal_columns], dados, id,chakras_df)
 
-sorted_df = chakras_df.sort_values(by='Soma', ascending=False)
+sorted_df = chakras_df.sort_values(by='Soma', ascending=True)
+
+print("Id: ", dados[dados["Id"] == id]["Id"][0])
+print("Nome Completo: ", dados[dados["Id"] == id]["Nome Completo:"][0])
+print("E-mail: ", dados[dados["Id"] == id]["E-mail:"][0])
+print("Whatsapp: ", dados[dados["Id"] == id]["Whatsapp:"][0])
+print("\n")
+
+# print(sorted_df.to_string(index=False))
+print(tabulate(sorted_df, headers="keys", tablefmt="grid"))
+
+min_nota = sorted_df['Soma'].min()
+# Seleciona as linhas com o valor mínimo
+min_rows = sorted_df[sorted_df['Soma'] == min_nota]
+# Imprime as linhas com o valor mínimo
+
+print("Menor nota: ", min_rows)
