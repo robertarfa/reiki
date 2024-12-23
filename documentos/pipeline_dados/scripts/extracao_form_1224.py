@@ -1,43 +1,50 @@
 import pandas as pd
 from fpdf import FPDF
-from tabulate import tabulate
-import io
+from docx import Document
 
 
-df = pd.read_excel('../AvaChakras.xlsx')
+df = pd.read_excel('../data_raw/AvaChakras.xlsx')
 
+df.head()
+df.columns
+varId = "Id"
 
+def validate_id():
+    if(df.columns[0] == 'ID'):
+        varId = "ID"
+    return varId
+        
 def filter_by_id(new_id):    
     # Find columns that start with "Pontos – ["
-    relevant_columns = [col for col in df.columns if col.startswith("Pontos – [")]
+    relevant_columns = [col for col in df.columns if (col.startswith("Pontos – [") | col.startswith("Points - ["))]
 
     # Group by 'E-mail:' and sum the relevant columns
-    grouped_df = df.groupby('Id')[relevant_columns].sum()
-
+    grouped_df = df.groupby(varId)[relevant_columns].sum()
     # Reset index to make 'E-mail:' a regular column
     grouped_df = grouped_df.reset_index()
 
     # Melt the DataFrame to long format
-    melted_df = grouped_df.melt(id_vars='Id', var_name='Chakra', value_name='Soma')
+    melted_df = grouped_df.melt(id_vars=varId, var_name='Chakra', value_name='Soma')
 
     # Merge with the data for Id == 1
-    return melted_df[melted_df['Id'] == new_id]
+    return melted_df[melted_df[varId] == new_id]
 
 def dados_resumidos(id):
     """Retorna um dicionário com dados resumidos para um ID específico, ou None se o ID não existir."""
-    linha = df[df["Id"] == id]  # Filtra o DataFrame
+    linha = df[df[varId] == id]  # Filtra o DataFrame
     if linha.empty:
         return None  # Retorna None se nenhuma linha corresponder ao ID
     else:
         linha = linha.iloc[0]  # Acessa a primeira (e única) linha
         return {
-            "Id": linha["Id"],
+            "Id": linha[varId],
             "Nome": linha["Nome Completo:"],
             "E-mail": linha["E-mail:"],
-            "Whatsapp": linha["Whatsapp:"]
+            "Whatsapp": linha["""Whatsapp:
+(Exemplo: 5511988881111)"""]
         }
 
-def chakra_menor_pontuacao(id_filtered):
+def pontuacao_chakras(id_filtered):
     resultados = {}
     for chakra in chakras:
         soma = id_filtered[id_filtered['Chakra'].str.contains(chakra)]['Soma'].sum()
@@ -46,8 +53,9 @@ def chakra_menor_pontuacao(id_filtered):
     dados_corrigidos = dict(map(lambda item: (item[0].replace('\\', '').replace('[', '').replace(']', ''), item[1]), resultados.items()))
     tabela = pd.DataFrame(list(dados_corrigidos.items()), columns=['Chakra', 'Pontos'])
 
-    tabela_ordenada = tabela.sort_values(by='Pontos', ascending=True) #Ordena em ordem crescente
+    return tabela.sort_values(by='Pontos', ascending=True)
 
+def chakra_menor_pontuacao(tabela_ordenada):
     min_nota = tabela_ordenada['Pontos'].min()
     # Seleciona as linhas com o valor mínimo
     min_rows = tabela_ordenada[tabela_ordenada['Pontos'] == min_nota]
@@ -59,21 +67,25 @@ chakras = [r'\[SEXUAL]', r'\[CARDÍACO]', r'\[SOLAR]',
            r'\[FRONTAL]', r'\[CORONÁRIO]', r'\[BASE]',
            r'\[LARÍNGEO]']
 
-id = 1
-dados_filtrados = filter_by_id(1)
-dados = dados_resumidos(1)
+id = 3
+varId = validate_id()
+dados_filtrados = filter_by_id(3)
+dados = dados_resumidos(3)
 
 print("Nome: ", dados["Nome"])
 print("E-mail: ", dados["E-mail"])
 print("Whatsapp: ", dados["Whatsapp"])
 print("\n")
 
-chakra_menor_pontuacao = chakra_menor_pontuacao(dados_filtrados)
+pontuacao_chakras = pontuacao_chakras(dados_filtrados)
+chakra_menor_pontuacao = chakra_menor_pontuacao(pontuacao_chakras)
 
+print("Pontuação dos Chakras: ")
+print(pontuacao_chakras)
+print("\n")
 
 print("Chakras Com menos pontos: ")
 print(chakra_menor_pontuacao)
-chakra_menor_pontuacao
 print("\n")
 
 
@@ -95,7 +107,8 @@ dados_pdf = {
         "E-mail": dados["E-mail"],
         "Whatsapp": dados["Whatsapp"]
     },
-    "Chakras Com Menos Pontos": chakra_menor_pontuacao,
+    "Pontuação dos Chakras": pontuacao_chakras ,
+    "Chakras em Desequilíbrio": chakra_menor_pontuacao,
     "Respostas Erradas": None # Initialize to None
 }
 
@@ -106,7 +119,7 @@ if not chakra_menor_pontuacao.empty: #Check if chakra_menor_pontuacao is not emp
         for chakra in chakra_menor_pontuacao["Chakra"]
     ], ignore_index=True) #add ignore_index=True to avoid issues with duplicate indices
 
-    respostas_erradas["Chakra"] = respostas_erradas["Chakra"].str.replace('Pontos – ', ' - ', regex=False).replace('"', '', regex=False)
+    respostas_erradas["Chakra"] = respostas_erradas["Chakra"].str.replace('Pontos – ', ' - ', regex=False).str.replace('Points - ', ' - ', regex=False).replace('"', '', regex=False)
     if not respostas_erradas.empty: #Check if any wrong answers exist after concatenation.
         dados_pdf["Respostas Erradas"] = respostas_erradas
 
@@ -136,13 +149,6 @@ if not chakra_menor_pontuacao.empty: #Check if chakra_menor_pontuacao is not emp
 
 
 # pdf.output("relatorio.pdf")
-
-from docx import Document
-from docx.shared import Inches
-
-# ... (seu código anterior para carregar dados, etc.) ...
-
-# ... (seu código para processar respostas erradas, que permanece o mesmo) ...
 
 
 # Criando o documento do Word
@@ -180,4 +186,15 @@ for secao, conteudo in dados_pdf.items():
     elif conteudo is None:
         add_paragraph(document, "Nenhuma resposta errada encontrada.")
 
-document.save("relatorio.docx")
+import datetime
+
+hoje = datetime.date.today()
+print(f"hoje: {hoje}")
+
+nome = f"{dados['Nome'].strip().replace('/', '_').replace('\\', '_').replace("  ", " ")}"
+email = f"{dados['E-mail'].strip().replace('/', '_').replace('\\', '_').replace("  ", " ")}"
+full = f"{nome}-{email}"
+filename = f"{dados["Id"]}-{full}-{hoje.strftime('%d%m%y')}.docx"
+path = f"../documentos/{filename}"
+
+document.save(path)
